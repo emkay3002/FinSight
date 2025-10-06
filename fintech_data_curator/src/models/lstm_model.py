@@ -17,13 +17,17 @@ def build_lstm_model(input_window: int) -> keras.Model:
     return model
 
 
-def train_lstm(model: keras.Model, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 20, batch_size: int = 32) -> keras.Model:
-    model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=0)
+def train_lstm(model: keras.Model, X_train: np.ndarray, y_train: np.ndarray, epochs: int = 20, batch_size: int = 32, verbose: int = 1) -> keras.Model:
+    if X_train.shape[0] == 0 or y_train.shape[0] == 0:
+        raise ValueError("Empty training data for LSTM: X_train or y_train has zero length")
+    model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=verbose)
     return model
 
 
 def forecast_lstm(model: keras.Model, last_window: np.ndarray, steps: int) -> np.ndarray:
     # Iterative forecasting: roll the window forward using predictions
+    if last_window.size == 0:
+        raise ValueError("Empty last_window provided to forecast_lstm")
     preds = []
     window = last_window.copy().reshape(1, -1, 1)
     for _ in range(steps):

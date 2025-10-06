@@ -105,11 +105,12 @@ def run_lstm(df: pd.DataFrame, horizon: int, window: int = 20, epochs: int = 20)
     test_scaled = transform_with_scaler(scaler, test_vals) if len(test_vals) > 0 else np.array([])
 
     X_train, y_train = create_sequences(train_scaled, max_window)
-    if X_train.shape[0] == 0:
+    if X_train.shape[0] == 0 or y_train.shape[0] == 0:
         raise ValueError(f"Insufficient data to train LSTM (series length={len(series)}, window={max_window})")
 
+    LOGGER.info("Starting LSTM training... samples=%d, window=%d, epochs=%d", X_train.shape[0], max_window, epochs)
     model = build_lstm_model(max_window)
-    model = train_lstm(model, X_train, y_train, epochs=epochs)
+    model = train_lstm(model, X_train, y_train, epochs=epochs, batch_size=32, verbose=1)
 
     # Prepare last window from the tail of the entire scaled series
     full_scaled = train_scaled if test_scaled.size == 0 else np.concatenate([train_scaled, test_scaled])
@@ -160,13 +161,19 @@ def main() -> None:
         df_pred = pd.DataFrame({"date": pd.date_range(start=start_date, periods=len(y_pred_full), freq="D", tz="UTC"), "prediction": y_pred_full})
         plot_path = plot_forecast(df_hist=df.tail(100), df_pred=df_pred, symbol=symbol, model_name=model_name)
 
-        # Save model weights
+        # Save model weights in compliant and friendly names
         models_dir = Path(__file__).resolve().parent.parent / "models"
         models_dir.mkdir(parents=True, exist_ok=True)
-        weights_path = models_dir / f"{symbol}_lstm_weights.h5"
-        model.save_weights(weights_path)
+        weights_compliant = models_dir / f"{symbol}_lstm.weights.h5"
+        weights_friendly = models_dir / f"{symbol}_lstm_weights.h5"
+        model.save_weights(weights_compliant)
+        # Also write a copy with underscore style for convenience
+        try:
+            model.save_weights(weights_friendly)
+        except Exception:
+            pass
         if args.upload and args.repo_id:
-            maybe_upload_model(weights_path, repo_id=args.repo_id, filename=weights_path.name)
+            maybe_upload_model(weights_compliant, repo_id=args.repo_id, filename=weights_compliant.name)
 
     else:
         raise ValueError("Unsupported model")
