@@ -8,10 +8,11 @@ A modular Python project to fetch and curate structured (prices) and unstructure
 - Scrape related headlines via RSS/newspaper
 - Sentiment analysis using TextBlob
 - Merge prices and news by date; save CSV and JSON
+- Optional MongoDB saving with normalized collections and indexes
 
 ## Tech
 - Python 3.10+
-- pandas, yfinance, requests, BeautifulSoup4, feedparser, newspaper3k, TextBlob
+- pandas, yfinance, requests, BeautifulSoup4, feedparser, newspaper3k, TextBlob, pymongo, python-dotenv
 
 ## Install
 ```bash
@@ -21,12 +22,20 @@ pip install -r requirements.txt
 python -m textblob.download_corpora  # one-time for TextBlob
 ```
 
+## Environment
+Create a `.env` file (ignored by git) in the project root, based on the following keys:
+```
+MONGODB_URI=
+MONGODB_DB=fintech_data_curator
+COINMARKETCAP_API_KEY=
+```
+
 ## Usage
 Run the CLI entry point:
 ```bash
-python -m src.main --exchange NASDAQ --symbol AAPL --days 10
+python -m src.main --exchange NASDAQ --symbol AAPL --days 10 --asset_type stock --mongo
 ```
-Outputs are saved under `data/` as `<SYMBOL>_dataset.csv` and `<SYMBOL>_dataset.json`.
+Outputs are saved under `data/` as `<SYMBOL>_dataset.csv` and `<SYMBOL>_dataset.json` and, if configured, in MongoDB.
 
 ## Sample runs
 ```bash
@@ -34,8 +43,10 @@ python sample_runs.py
 ```
 This will generate outputs for AAPL, MSFT, and BTC-USD.
 
-## Environment variables (optional)
-- `COINMARKETCAP_API_KEY` to use CoinMarketCap for crypto historical prices.
+## MongoDB schema
+- `prices`: unique by `symbol`+`date` (index)
+- `news`: unique by `url` (sparse unique), fallback key `symbol`+`date`+`title`
+- `datasets`: merged view unique by `symbol`+`date` (index)
 
 ## Project structure
 ```
@@ -50,6 +61,7 @@ fintech_data_curator/
     feature_engineering.py
     sentiment_analysis.py
     data_merger.py
+    mongo_storage.py
     utils.py
   sample_runs.py
   requirements.txt

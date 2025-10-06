@@ -4,6 +4,11 @@ import os
 from dataclasses import dataclass
 from typing import Optional
 
+from dotenv import load_dotenv
+
+# Load .env if present
+load_dotenv()
+
 
 @dataclass(frozen=True)
 class Config:

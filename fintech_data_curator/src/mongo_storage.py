@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date, datetime, timezone
 from typing import Any, Dict, Iterable, Optional
 
 from pymongo import ASCENDING, MongoClient, UpdateOne
@@ -38,11 +39,29 @@ def get_db() -> Optional[MongoCollections]:
     return MongoCollections(prices=prices, news=news, datasets=datasets)
 
 
+def _ensure_datetime(value: Any) -> Any:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value
+    if isinstance(value, date):
+        return datetime(value.year, value.month, value.day, tzinfo=timezone.utc)
+    return value
+
+
+def _normalize_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    out = dict(row)
+    if "date" in out:
+        out["date"] = _ensure_datetime(out["date"])
+    return out
+
+
 def upsert_prices(coll: Collection, rows: Iterable[Dict[str, Any]]) -> None:
     ops = []
     for r in rows:
-        key = {"symbol": r["symbol"], "date": r["date"]}
-        ops.append(UpdateOne(key, {"$set": r}, upsert=True))
+        nr = _normalize_row(r)
+        key = {"symbol": nr["symbol"], "date": nr["date"]}
+        ops.append(UpdateOne(key, {"$set": nr}, upsert=True))
     if ops:
         res = coll.bulk_write(ops, ordered=False)
         LOGGER.info("Mongo prices upserted: matched=%s upserted=%s", res.matched_count, getattr(res, "upserted_count", 0))
@@ -51,8 +70,9 @@ def upsert_prices(coll: Collection, rows: Iterable[Dict[str, Any]]) -> None:
 def upsert_news(coll: Collection, rows: Iterable[Dict[str, Any]]) -> None:
     ops = []
     for r in rows:
-        key = {"url": r.get("url")} if r.get("url") else {"symbol": r["symbol"], "date": r["date"], "title": r["title"]}
-        ops.append(UpdateOne(key, {"$setOnInsert": r}, upsert=True))
+        nr = _normalize_row(r)
+        key = {"url": nr.get("url")} if nr.get("url") else {"symbol": nr["symbol"], "date": nr["date"], "title": nr["title"]}
+        ops.append(UpdateOne(key, {"$setOnInsert": nr}, upsert=True))
     if ops:
         res = coll.bulk_write(ops, ordered=False)
         LOGGER.info("Mongo news upserted: matched=%s upserted=%s", res.matched_count, getattr(res, "upserted_count", 0))
@@ -61,8 +81,9 @@ def upsert_news(coll: Collection, rows: Iterable[Dict[str, Any]]) -> None:
 def upsert_dataset(coll: Collection, rows: Iterable[Dict[str, Any]]) -> None:
     ops = []
     for r in rows:
-        key = {"symbol": r["symbol"], "date": r["date"]}
-        ops.append(UpdateOne(key, {"$set": r}, upsert=True))
+        nr = _normalize_row(r)
+        key = {"symbol": nr["symbol"], "date": nr["date"]}
+        ops.append(UpdateOne(key, {"$set": nr}, upsert=True))
     if ops:
         res = coll.bulk_write(ops, ordered=False)
         LOGGER.info("Mongo dataset upserted: matched=%s upserted=%s", res.matched_count, getattr(res, "upserted_count", 0))
