@@ -21,11 +21,20 @@ def inverse_transform_with_scaler(scaler: MinMaxScaler, values: np.ndarray) -> n
 
 
 def create_sequences(series: np.ndarray, window: int) -> Tuple[np.ndarray, np.ndarray]:
+    if window < 1:
+        raise ValueError("window must be >= 1")
+    if len(series) <= window:
+        # Not enough data to form a single (window -> target) pair
+        return np.empty((0, window, 1)), np.empty((0,))
+
     X, y = [], []
     for i in range(len(series) - window):
         X.append(series[i : i + window])
         y.append(series[i + window])
+
+    if not X:
+        return np.empty((0, window, 1)), np.empty((0,))
+
     X_arr = np.array(X)
     y_arr = np.array(y)
-    # reshape to [samples, time_steps, features]
     return X_arr.reshape((X_arr.shape[0], X_arr.shape[1], 1)), y_arr
