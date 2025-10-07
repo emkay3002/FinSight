@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import argparse
+from pathlib import Path
+import sys
 
-import numpy as np
-import pandas as pd
+try:
+    from backend.forecasting.service import load_data, run_arima_service, run_lstm_service
+except ModuleNotFoundError:
+    sys.path.append(str(Path(__file__).resolve().parents[2]))
+    from backend.forecasting.service import load_data, run_arima_service, run_lstm_service  # type: ignore
 
-from .main_forecast import load_data, run_arima, run_lstm
-from .models.metrics import rmse, mae, mape
+from fintech_data_curator.src.models.metrics import rmse, mae, mape
 
 
 def parse_args() -> argparse.Namespace:
@@ -25,24 +29,16 @@ def main() -> None:
     df = load_data(symbol, use_mongo=args.mongo, limit_days=180)
 
     # ARIMA
-    arima_pred, arima_test = run_arima(df, horizon=horizon)
+    arima_pred, arima_test = run_arima_service(df, horizon=horizon)
     arima_true = arima_test.tail(min(len(arima_test), len(arima_pred))).values
     arima_eval_pred = arima_pred[: len(arima_true)]
-    arima_metrics = {
-        "rmse": rmse(arima_true, arima_eval_pred),
-        "mae": mae(arima_true, arima_eval_pred),
-        "mape": mape(arima_true, arima_eval_pred),
-    }
+    arima_metrics = {"rmse": rmse(arima_true, arima_eval_pred), "mae": mae(arima_true, arima_eval_pred), "mape": mape(arima_true, arima_eval_pred)}
 
     # LSTM
-    lstm_pred, lstm_test, _ = run_lstm(df, horizon=horizon)
+    lstm_pred, lstm_test, _model, _win = run_lstm_service(df, horizon=horizon)
     lstm_true = lstm_test.tail(min(len(lstm_test), len(lstm_pred))).values
     lstm_eval_pred = lstm_pred[: len(lstm_true)]
-    lstm_metrics = {
-        "rmse": rmse(lstm_true, lstm_eval_pred),
-        "mae": mae(lstm_true, lstm_eval_pred),
-        "mape": mape(lstm_true, lstm_eval_pred),
-    }
+    lstm_metrics = {"rmse": rmse(lstm_true, lstm_eval_pred), "mae": mae(lstm_true, lstm_eval_pred), "mape": mape(lstm_true, lstm_eval_pred)}
 
     print(f"Symbol: {symbol} | Horizon: {horizon} days\n")
     print("Model     RMSE        MAE         MAPE (%)")
